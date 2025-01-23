@@ -31,15 +31,19 @@ function App() {
     if (!canvas) return;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const newX =
-        ((moveEvent.clientX - canvas.getBoundingClientRect().left) /
-          canvas.width) *
-        100;
-      const newY =
-        ((moveEvent.clientY - canvas.getBoundingClientRect().top) /
-          canvas.height) *
-        100;
-      setValvePosition({ x_percent: newX, y_percent: newY });
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+      const mouseY = ((moveEvent.clientY - rect.top) / rect.height) * 100;
+
+      const rotatedMousePosition = rotatePosition(
+        { x_percent: mouseX, y_percent: mouseY },
+        360 - angle
+      );
+
+      setValvePosition({
+        x_percent: rotatedMousePosition.x_percent,
+        y_percent: rotatedMousePosition.y_percent,
+      });
     };
 
     const handleMouseUp = () => {
