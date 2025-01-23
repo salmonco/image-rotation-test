@@ -8,8 +8,10 @@ function App() {
     { id: number; x_percent: number; y_percent: number }[]
   >([]);
   const [draggingValveId, setDraggingValveId] = useState<number | null>(null);
-  const imageSrc =
-    "https://newsimg.hankookilbo.com/2017/03/06/201703061667340308_1.jpg";
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+
+  const MAX_WIDTH = 600;
+  const MAX_HEIGHT = 300;
 
   const rotateImage = () => {
     setAngle((prevAngle) => (prevAngle + 90) % 360); // 90도 회전
@@ -94,9 +96,20 @@ function App() {
     return { x_percent: newX, y_percent: newY };
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImageSrc(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !imageSrc) return;
 
     const context = canvas.getContext("2d");
     if (!context) return;
@@ -106,8 +119,20 @@ function App() {
 
     image.onload = () => {
       // 원래 이미지의 너비와 높이
-      const originalWidth = image.width;
-      const originalHeight = image.height;
+      let originalWidth = image.width;
+      let originalHeight = image.height;
+
+      // 이미지 크기가 최대 크기를 초과할 경우 크기 조정
+      if (originalWidth > MAX_WIDTH || originalHeight > MAX_HEIGHT) {
+        const aspectRatio = originalWidth / originalHeight;
+        if (originalWidth > originalHeight) {
+          originalWidth = MAX_WIDTH;
+          originalHeight = MAX_WIDTH / aspectRatio;
+        } else {
+          originalHeight = MAX_HEIGHT;
+          originalWidth = MAX_HEIGHT * aspectRatio;
+        }
+      }
 
       // 회전된 이미지의 크기 계산
       const radians = (angle * Math.PI) / 180;
@@ -130,7 +155,13 @@ function App() {
       context.save();
       context.translate(centerX, centerY);
       context.rotate(radians); // 각도를 라디안으로 변환
-      context.drawImage(image, -originalWidth / 2, -originalHeight / 2);
+      context.drawImage(
+        image,
+        -originalWidth / 2,
+        -originalHeight / 2,
+        originalWidth,
+        originalHeight
+      );
       context.restore();
 
       // 밸브 버튼 그리기
@@ -163,6 +194,7 @@ function App() {
   return (
     <div>
       <h3>이미지 회전 테스트</h3>
+      <input type="file" accept="image/*" onChange={handleImageUpload} />
       <canvas
         ref={canvasRef}
         style={{ border: "1px solid black" }}
