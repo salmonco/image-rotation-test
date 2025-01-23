@@ -4,10 +4,10 @@ import "./App.css";
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [angle, setAngle] = useState(0);
-  const [valvePosition, setValvePosition] = useState<{
-    x_percent: number;
-    y_percent: number;
-  } | null>(null);
+  const [valves, setValves] = useState<
+    { id: number; x_percent: number; y_percent: number }[]
+  >([]);
+  const [draggingValveId, setDraggingValveId] = useState<number | null>(null);
   const imageSrc =
     "https://newsimg.hankookilbo.com/2017/03/06/201703061667340308_1.jpg";
 
@@ -18,41 +18,50 @@ function App() {
   const addValve = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    setValvePosition({
-      x_percent: (30 / canvas.width) * 100,
-      y_percent: (30 / canvas.height) * 100,
-    }); // 이미지 중앙에 밸브 추가
+    setValves((prevValves) => [
+      ...prevValves,
+      {
+        id: prevValves.length,
+        x_percent: (30 / canvas.width) * 100,
+        y_percent: (30 / canvas.height) * 100,
+      },
+    ]);
   };
 
-  const handleMouseDown = () => {
-    if (!valvePosition) return;
+  const handleMouseDown = (valveId: number) => {
+    setDraggingValveId(valveId);
+  };
+
+  const handleMouseMove = (moveEvent: MouseEvent) => {
+    if (draggingValveId === null) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = ((moveEvent.clientX - rect.left) / rect.width) * 100;
-      const mouseY = ((moveEvent.clientY - rect.top) / rect.height) * 100;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+    const mouseY = ((moveEvent.clientY - rect.top) / rect.height) * 100;
 
-      const rotatedMousePosition = rotatePosition(
-        { x_percent: mouseX, y_percent: mouseY },
-        360 - angle
-      );
+    const rotatedMousePosition = rotatePosition(
+      { x_percent: mouseX, y_percent: mouseY },
+      360 - angle
+    );
 
-      setValvePosition({
-        x_percent: rotatedMousePosition.x_percent,
-        y_percent: rotatedMousePosition.y_percent,
-      });
-    };
+    setValves((prevValves) =>
+      prevValves.map((valve) =>
+        valve.id === draggingValveId
+          ? {
+              ...valve,
+              x_percent: rotatedMousePosition.x_percent,
+              y_percent: rotatedMousePosition.y_percent,
+            }
+          : valve
+      )
+    );
+  };
 
-    const handleMouseUp = () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+  const handleMouseUp = () => {
+    setDraggingValveId(null);
   };
 
   const rotatePosition = (
@@ -125,8 +134,8 @@ function App() {
       context.restore();
 
       // 밸브 버튼 그리기
-      if (valvePosition) {
-        const rotatedPosition = rotatePosition(valvePosition, angle);
+      valves.forEach((valve) => {
+        const rotatedPosition = rotatePosition(valve, angle);
 
         const rotatedValveX = (rotatedPosition.x_percent / 100) * canvas.width;
         const rotatedValveY = (rotatedPosition.y_percent / 100) * canvas.height;
@@ -137,9 +146,19 @@ function App() {
         context.arc(rotatedValveX, rotatedValveY, 10, 0, Math.PI * 2); // 회전된 위치에 밸브 버튼을 그리기
         context.fill();
         context.restore();
-      }
+      });
     };
-  }, [angle, imageSrc, valvePosition]);
+  }, [angle, imageSrc, valves]);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
 
   return (
     <div>
@@ -147,7 +166,26 @@ function App() {
       <canvas
         ref={canvasRef}
         style={{ border: "1px solid black" }}
-        onMouseDown={handleMouseDown}
+        onMouseDown={(e) => {
+          const rect = canvasRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
+          const mouseY = ((e.clientY - rect.top) / rect.height) * 100;
+
+          const rotatedMousePosition = rotatePosition(
+            { x_percent: mouseX, y_percent: mouseY },
+            360 - angle
+          );
+
+          const clickedValve = valves.find(
+            (valve) =>
+              Math.abs(valve.x_percent - rotatedMousePosition.x_percent) < 5 &&
+              Math.abs(valve.y_percent - rotatedMousePosition.y_percent) < 5
+          );
+          if (clickedValve) {
+            handleMouseDown(clickedValve.id);
+          }
+        }}
       />
       <div>
         <button onClick={rotateImage}>회전하기</button>
